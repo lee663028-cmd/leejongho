@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>생산계획 기초 자료</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2330;--sub:#667085;--line:#e3e6ec;--accent:#2457d6;--accent-bg:#e8eefc;--hit:#fff3c4;--hit-line:#e0a800}
+@media (prefers-color-scheme:dark){:root{--bg:#12151b;--card:#1b2029;--ink:#e8ebf0;--sub:#99a3b3;--line:#2b3340;--accent:#7ea2ff;--accent-bg:#232d4a;--hit:#4a3d0c;--hit-line:#d9a900}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Malgun Gothic",system-ui,sans-serif;padding:20px 16px 48px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--sub);margin:0 0 16px}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+.tab[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+input[type=search]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;min-width:240px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.kpi b{display:block;font-size:20px}
+.kpi span{color:var(--sub);font-size:12px}
+.scroll{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:var(--bg);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+.bw{display:inline-block;width:90px;height:8px;background:var(--line);border-radius:4px;vertical-align:middle;margin-left:8px;overflow:hidden}
+.bw i{display:block;height:100%;background:var(--accent)}
+.dash{color:var(--sub)}
+.group{margin-bottom:16px}
+.group h2{font-size:15px;margin:0 0 8px}
+.group h2 small{color:var(--sub);font-weight:400;margin-left:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.eq{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.eq.hit{border-color:var(--hit-line)}
+.eq h3{margin:0 0 6px;font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:2px 9px;font:inherit;font-size:12px;cursor:pointer}
+.eq.hit .chip.m{background:var(--hit);border-color:var(--hit-line)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.hint{color:var(--sub);font-size:12px;margin:0 0 10px}
+.empty{color:var(--sub);padding:16px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>생산계획 기초 자료</h1>
+  <p class="sub">원본: 1. 생산계획 기초 자료.xlsx · BOM 재고현황 / 장비별 작업 가능 공정</p>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-t="bom">BOM 재고현황</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="eq">장비별 작업 가능 공정</button>
+  </div>
+
+  <section id="bom">
+    <div class="kpis" id="kpis"></div>
+    <div class="scroll"><table>
+      <thead><tr><th class="n">No.</th><th>고객사</th><th>아이템</th><th>품번(공정)</th><th class="n">외주창고</th><th class="n">재공창고</th></tr></thead>
+      <tbody id="bomBody"></tbody>
+    </table></div>
+  </section>
+
+  <section id="eq" hidden>
+    <div class="bar">
+      <input type="search" id="q" placeholder="장비명 / 품번 / 공정 검색 (예: TC03, 29546672, OP50)">
+    </div>
+    <p class="hint">품번 칩을 클릭하면 그 품번을 작업할 수 있는 모든 장비가 노란색으로 강조됩니다. 다시 클릭하면 해제됩니다.</p>
+    <div id="groups"></div>
+  </section>
+</div>
+
+<script>
+const bom=[
+ [20,"Allison Transmission","29546673","29546672(소재)",null,null],
+ [21,"Allison Transmission","","29546672(OP15)",null,null],
+ [22,"Allison Transmission","","29546672(OP20)",null,275],
+ [23,"Allison Transmission","","29546672(OP30)",null,null],
+ [24,"Allison Transmission","","29546672(OP40)",null,6],
+ [25,"Allison Transmission","","29546672(OP50)",null,6],
+ [26,"Allison Transmission","","29546672(OP60)",null,93],
+ [27,"Allison Transmission","","29546672(리크)",null,49],
+ [28,"Allison Transmission","","29546672(AD 전 검사)",24,null],
+ [29,"Allison Transmission","","29546672(AD)",null,null],
+ [32,"Allison Transmission","","29546672(GP)",null,160],
+ [36,"Allison Transmission","","29546673(조립)",null,144]
+];
+const eq=[
+ ["소재","소재",["29546672(소재)","29551547(소재)","29536743(소재)","29544957(소재)","29530485(소재)","29506122(소재)","29542986(소재)","29547922(OP10,20)","29543984(OP10,20)","29527363(소재)","29544189(소재)","29528621(소재)","29571892(소재)","8M0114107(용접)","8M0172709(용접)","8M0176537(용접)"]],
+ ["크래들 라인","HMCT01",["8M0124242(OP60)","8M0172715(OP50)"]],
+ ["크래들 라인","HMCT02",["8M0124242(OP60)","8M0172715(OP50)"]],
+ ["크래들 라인","HMCT03",["8M0124242(OP60)"]],
+ ["크래들 라인","HMCT04",["8M0124242(OP60)"]],
+ ["크래들 라인","HMCT11",["8M0172715(OP50)"]],
+ ["크래들 라인","HMCT12",["8M0172715(OP50)"]],
+ ["크래들 라인","HMCT13",["8M0172715(OP50)"]],
+ ["크래들 라인","HMCT14",["8M0172715(OP50)"]],
+ ["1라인","TC01",["29544957(OP50)","29551547(OP15)"]],
+ ["1라인","TC03",["29546672(OP20)"]],
+ ["1라인","VL02",["29546672(OP30)","29551547(OP30)"]],
+ ["1라인","VL03",["29546672(OP30)","29551547(OP30)"]],
+ ["1라인","VL01",["29546672(OP40)"]],
+ ["1라인","5AX01",["29546672(OP50)","29551547(OP50)","29551653(OP50)"]],
+ ["1라인","5AX03",["29546672(OP50)","29551547(OP50)","29551653(OP50)"]],
+ ["1라인","HMCT06",["29546672(OP60)","29551547(OP60)","29551653(OP60)"]],
+ ["1라인","HMCT07",["29546672(OP60)","29551547(OP60)","29551653(OP60)"]],
+ ["소형 V/B라인","RTC01",["29542986(OP10)","29547922(OP10,20)","29543984(OP10,20)"]],
+ ["소형 V/B라인","RTC02",["29542986(OP10)","29547922(OP10,20)","29543984(OP10,20)"]],
+ ["소형 V/B라인","RTC03",["29542986(OP10)","29547922(OP10,20)","29543984(OP10,20)"]],
+ ["소형 V/B라인","RTC04",["29542986(OP10)","29547922(OP10,20)","29543984(OP10,20)"]],
+ ["소형 V/B라인","HMCT15",["8M0124242(OP60)","8M0172715(OP50)","29571893(OP20)"]],
+ ["2라인","TC02",["29546672(OP15)"]],
+ ["2라인","TC04",["29544957(OP20)"]],
+ ["2라인","TC05",["29536743(OP20)"]],
+ ["2라인","TC13",["29551547(OP20)"]],
+ ["2라인","TC14",["29536743(OP70)"]],
+ ["2라인","VL05",["29536743(OP50)"]],
+ ["2라인","VL06",["29536743(OP60)"]],
+ ["2라인","VL07",["29544957(OP30)"]],
+ ["2라인","VL13",["29544957(OP40)"]],
+ ["2라인","VL08",["29536743(OP60)","29544957(OP40)"]],
+ ["3라인","TC06",["29530485(OP20)","29506122(OP20)"]],
+ ["3라인","TC07",["29530485(OP20)","29506122(OP20)"]],
+ ["3라인","VL10",["29530485(OP30)","29506122(OP30)"]],
+ ["3라인","VL09",["29530485(OP40)","29506122(OP40)"]],
+ ["3라인","VL11",["29530485(OP30)","29506122(OP30)"]],
+ ["3라인","VL12",["29530485(OP40)","29506122(OP40)"]],
+ ["3라인","5AX04",["29530485(OP50)","29506122(OP50)"]],
+ ["3라인","5AX05",["29530485(OP50)","29506122(OP50)"]],
+ ["대형 V/B라인","TC08",["29528543(OP10)","29528543(OP30)","29544189(OP10)","29544189(OP30)","29528632(OP10)","29528632(OP30)","29571893(OP10)"]],
+ ["대형 V/B라인","TC09",["29528543(OP10)","29528543(OP30)","29544189(OP10)","29544189(OP30)","29528632(OP10)","29528632(OP30)","29571893(OP10)"]],
+ ["대형 V/B라인","HMCT08",["29528543(OP20)","29528543(OP40)","29544189(OP20)","29544189(OP40)","29528632(OP20)","29528632(OP40)","29571893(OP20)"]],
+ ["대형 V/B라인","HMCT05",["29528543(OP20)","29528543(OP40)","29544189(OP20)","29544189(OP40)","29528632(OP20)","29528632(OP40)","29571893(OP20)"]],
+ ["리크라인","LEAK01",["29546672(리크)","29551547(리크)","29551653(리크)","29536743(리크)","29544957(리크)","29506122(리크)"]],
+ ["리크라인","LEAK02",["29546672(리크)","29551547(리크)","29551653(리크)","29536743(리크)","29544957(리크)"]],
+ ["리크라인","LEAK04",["29530485(리크)"]],
+ ["후처리","AD 전 검사",["29546672(AD 전 검사)","29551547(AD 전 검사)","29551653(AD전검사)"]],
+ ["후처리","AD",["29546672(AD)","29551547(AD)","29551653(AD)","29542986(AD)","29547922(AD)","29543984(AD)"]],
+ ["후처리","GP",["29546672(GP)","29551547(GP)","29551653(GP)","29536743(GP)","29544957(GP)","29530485(GP)","29506122(GP)","29542986(GP)","29547922(GP)","29543984(GP)"]],
+ ["후처리","조립",["29546673(조립)","29551651(조립)","29551652(조립)","29543985(조립)"]],
+ ["후처리","사상",["8M0124242(사상)","8M0172715(사상)"]],
+ ["후처리","출하대기",["8M0124242(출하대기)","8M0172715(출하대기)","8M0176536(출하대기)"]]
+];
+
+const $=s=>document.querySelector(s);
+const fmt=v=>v==null?'<span class="dash">-</span>':v.toLocaleString();
+
+(function(){
+  const max=Math.max(...bom.map(r=>r[5]||0));
+  const wip=bom.reduce((a,r)=>a+(r[5]||0),0), out=bom.reduce((a,r)=>a+(r[4]||0),0);
+  const top=bom.reduce((a,r)=>(r[5]||0)>(a[5]||0)?r:a,bom[0]);
+  $('#kpis').innerHTML=[
+    [bom.length,'공정 수'],[wip.toLocaleString(),'재공창고 합계'],[out.toLocaleString(),'외주창고 합계'],[top[3],'재공 최다 공정 ('+top[5]+')']
+  ].map(k=>`<div class="kpi"><b>${k[0]}</b><span>${k[1]}</span></div>`).join('');
+  $('#bomBody').innerHTML=bom.map(r=>`<tr><td class="n">${r[0]}</td><td>${r[1]}</td><td>${r[2]||''}</td><td>${r[3]}</td><td class="n">${fmt(r[4])}</td><td class="n">${fmt(r[5])}${r[5]?`<span class="bw"><i style="width:${r[5]/max*100}%"></i></span>`:''}</td></tr>`).join('');
+})();
+
+let sel=null,query='';
+const partOf=p=>p.replace(/\(.*$/,'').trim();
+function renderEq(){
+  const groups={};
+  eq.forEach(e=>(groups[e[0]]=groups[e[0]]||[]).push(e));
+  const q=query.trim().toLowerCase();
+  let html='';
+  for(const g in groups){
+    const items=groups[g].filter(e=>!q||(e[1]+' '+e[2].join(' ')).toLowerCase().includes(q));
+    if(!items.length)continue;
+    html+=`<div class="group"><h2>${g}<small>${items.length}대</small></h2><div class="grid">`+items.map(e=>{
+      const hit=sel&&e[2].some(p=>partOf(p)===sel);
+      return `<div class="eq${hit?' hit':''}"><h3>${e[1]}</h3><div class="chips">`+e[2].map(p=>{
+        const pn=partOf(p),on=sel===pn,m=on?' on':'';
+        return `<button class="chip${on?' m on':''}" data-p="${pn}">${p.trim()}</button>`;
+      }).join('')+`</div></div>`;
+    }).join('')+`</div></div>`;
+  }
+  $('#groups').innerHTML=html||'<div class="empty">검색 결과가 없습니다.</div>';
+}
+$('#groups').addEventListener('click',e=>{
+  const c=e.target.closest('.chip'); if(!c)return;
+  sel=sel===c.dataset.p?null:c.dataset.p; renderEq();
+});
+$('#q').addEventListener('input',e=>{query=e.target.value;renderEq()});
+renderEq();
+
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',x===b));
+  $('#bom').hidden=b.dataset.t!=='bom'; $('#eq').hidden=b.dataset.t!=='eq';
+}));
+</script>
+</body>
+</html>
